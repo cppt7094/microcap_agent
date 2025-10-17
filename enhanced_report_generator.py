@@ -670,14 +670,128 @@ class MarketServiceAdapter:
         return {}
 
     async def get_technicals_alpha_vantage(self, ticker):
-        if self.mgr.alpha_vantage:
-            rsi = self.mgr.alpha_vantage.get_rsi(ticker)
-            macd = self.mgr.alpha_vantage.get_macd(ticker)
+        """
+        Get technicals using Polygon instead of Alpha Vantage to avoid rate limits
+        Calculates RSI, MACD, support/resistance from raw price bars
+        """
+        try:
+            if not self.mgr.polygon:
+                return {}
+
+            # Get 50 days of bars from Polygon (need historical data for indicators)
+            from datetime import datetime, timedelta
+            import requests
+
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=60)  # Extra buffer for weekends
+
+            url = f"{self.mgr.polygon.base_url}/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}"
+            params = {'apiKey': self.mgr.polygon.api_key}
+
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get('status') != 'OK' or not data.get('results'):
+                return {}
+
+            # Convert Polygon format to our bar format
+            bars = []
+            for bar in data['results']:
+                bars.append({
+                    'close': bar['c'],
+                    'high': bar['h'],
+                    'low': bar['l'],
+                    'open': bar['o'],
+                    'volume': bar['v']
+                })
+
+            if len(bars) < 20:
+                return {}
+
+            # Calculate RSI manually
+            rsi = self._calculate_rsi_from_bars(bars)
+
+            # Calculate MACD manually
+            macd_data = self._calculate_macd_from_bars(bars)
+
+            # Calculate support/resistance
+            support, resistance = self._calculate_support_resistance(bars)
+
             return {
-                'rsi': rsi.get('rsi') if rsi else None,
-                'macd': macd.get('macd') if macd else None
+                'rsi': rsi,
+                'macd': macd_data.get('macd') if macd_data else None,
+                'macd_signal': macd_data.get('signal') if macd_data else None,
+                'support': support,
+                'resistance': resistance
             }
-        return {}
+
+        except Exception as e:
+            print(f"Error getting technicals for {ticker}: {e}")
+            return {}
+
+    def _calculate_rsi_from_bars(self, bars: List[Dict], period: int = 14) -> float:
+        """Calculate RSI from price bars"""
+        if len(bars) < period + 1:
+            return None
+
+        closes = [bar['close'] for bar in bars[-period-1:]]
+        deltas = [closes[i+1] - closes[i] for i in range(len(closes)-1)]
+
+        gains = [d if d > 0 else 0 for d in deltas]
+        losses = [-d if d < 0 else 0 for d in deltas]
+
+        avg_gain = sum(gains) / period
+        avg_loss = sum(losses) / period
+
+        if avg_loss == 0:
+            return 100.0
+
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        return round(rsi, 2)
+
+    def _calculate_macd_from_bars(self, bars: List[Dict]) -> Dict:
+        """Calculate MACD (12, 26, 9)"""
+        if len(bars) < 26:
+            return None
+
+        closes = [bar['close'] for bar in bars]
+
+        # Calculate EMAs
+        ema_12 = self._calculate_ema(closes, 12)
+        ema_26 = self._calculate_ema(closes, 26)
+
+        macd_line = ema_12 - ema_26
+
+        return {
+            'macd': round(macd_line, 2),
+            'signal': None  # Simplified for now
+        }
+
+    def _calculate_ema(self, prices: List, period: int) -> float:
+        """Calculate Exponential Moving Average"""
+        k = 2 / (period + 1)
+        ema = prices[0]
+
+        for price in prices[1:]:
+            ema = (price * k) + (ema * (1 - k))
+
+        return ema
+
+    def _calculate_support_resistance(self, bars: List[Dict]) -> tuple:
+        """Calculate support and resistance from recent bars"""
+        if len(bars) < 20:
+            return None, None
+
+        recent_bars = bars[-20:]  # Last 20 days
+        lows = [bar['low'] for bar in recent_bars]
+        highs = [bar['high'] for bar in recent_bars]
+
+        support = min(lows)
+        resistance = max(highs)
+
+        return round(support, 2), round(resistance, 2)
 
     async def get_options_flow_polygon(self, ticker):
         # Placeholder - implement if you have options data
