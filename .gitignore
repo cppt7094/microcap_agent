@@ -55,6 +55,9 @@ reports/
 morning_brief_*.md
 market_close_*.md
 
+# Cache directory (API responses)
+cache/
+
 # IDE
 .vscode/
 .idea/

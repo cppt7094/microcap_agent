@@ -642,6 +642,10 @@ class MarketServiceAdapter:
     def __init__(self, market_data_manager):
         self.mgr = market_data_manager
 
+        # Initialize cache to avoid API rate limits
+        from simple_cache import SimpleCache
+        self.cache = SimpleCache()
+
     async def get_spy_data(self):
         return await self.mgr.get_spy_data()
 
@@ -673,7 +677,17 @@ class MarketServiceAdapter:
         """
         Get technicals using Polygon instead of Alpha Vantage to avoid rate limits
         Calculates RSI, MACD, support/resistance from raw price bars
+        WITH CACHING to avoid hitting rate limits
         """
+        # Try cache first (cache for 30 minutes - technicals don't change that fast)
+        cache_key = f"technicals_{ticker}"
+        cached = self.cache.get(cache_key, max_age_minutes=30)
+
+        if cached:
+            print(f"✓ Using cached technicals for {ticker}")
+            return cached
+
+        # Fetch fresh data from Polygon
         try:
             if not self.mgr.polygon:
                 return {}
@@ -681,12 +695,16 @@ class MarketServiceAdapter:
             # Get 50 days of bars from Polygon (need historical data for indicators)
             from datetime import datetime, timedelta
             import requests
+            import time
 
             end_date = datetime.now().date()
             start_date = end_date - timedelta(days=60)  # Extra buffer for weekends
 
             url = f"{self.mgr.polygon.base_url}/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}"
             params = {'apiKey': self.mgr.polygon.api_key}
+
+            # Add small delay to respect rate limits (5 req/min = 12 seconds between requests)
+            time.sleep(0.2)  # 200ms delay
 
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
@@ -718,13 +736,19 @@ class MarketServiceAdapter:
             # Calculate support/resistance
             support, resistance = self._calculate_support_resistance(bars)
 
-            return {
+            technicals = {
                 'rsi': rsi,
                 'macd': macd_data.get('macd') if macd_data else None,
                 'macd_signal': macd_data.get('signal') if macd_data else None,
                 'support': support,
                 'resistance': resistance
             }
+
+            # Cache the result
+            self.cache.set(cache_key, technicals)
+            print(f"✓ Cached technicals for {ticker}")
+
+            return technicals
 
         except Exception as e:
             print(f"Error getting technicals for {ticker}: {e}")
