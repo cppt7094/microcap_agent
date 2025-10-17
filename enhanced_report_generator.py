@@ -61,6 +61,9 @@ class EnhancedReportGenerator:
         # Find opportunities using YOUR scanners
         opportunities = await self._scan_opportunities()
 
+        # AGGRESSIVE TRADER FEATURE: Scan for contrarian dip-buy opportunities
+        contrarian_opps = await self._scan_contrarian_opportunities(portfolio_data, regime)
+
         # Build the report
         report = f"""
 # 📊 INTELLIGENT MORNING BRIEF - Project Tehama
@@ -96,6 +99,9 @@ class EnhancedReportGenerator:
 ## 🎯 HIGH-PROBABILITY SETUPS
 {await self._format_opportunities(opportunities)}
 
+## 🔥 CONTRARIAN DIP-BUY OPPORTUNITIES (Aggressive Trader)
+{self._format_contrarian_opportunities(contrarian_opps)}
+
 ## 📰 NEWS CATALYSTS (Multi-Source)
 ### Finnhub Institutional News
 {self._format_finnhub_news(news)}
@@ -114,48 +120,80 @@ class EnhancedReportGenerator:
 
     async def _get_claude_analysis(self, position: Dict, context: Dict, regime: Dict) -> str:
         """
-        Get Claude's analysis using all your data sources
+        Get Claude's analysis using all your data sources with aggressive momentum trader personality
         """
-        prompt = f"""
-        Analyze this position using comprehensive market data:
 
-        POSITION: {position['symbol']} - {position['shares']} @ ${position['entry']:.2f}
-        Current: ${position['current']:.2f} ({position['pnl_pct']:+.2f}%)
+        # SYSTEM PROMPT - Defines Claude's personality and approach
+        system_prompt = """You are an aggressive microcap momentum trader with high risk tolerance. Your philosophy:
 
-        FUNDAMENTALS (FMP):
-        - P/E: {context['fundamentals'].get('pe_ratio', 'N/A')}
-        - Revenue Growth: {context['fundamentals'].get('revenue_growth', 'N/A')}
-        - Insider Ownership: {context['fundamentals'].get('insider_ownership', 'N/A')}
+RISK APPETITE:
+- Willing to accept -20% to -30% losses on individual positions for potential 5-10x winners
+- Daily volatility of -5% to -10% is NORMAL and not a reason to sell
+- Let winners run with trailing stops - don't cut flowers to water weeds
+- Red days in bull markets = buying opportunities on quality names, not panic selling
 
-        TECHNICALS (Alpha Vantage):
-        - RSI: {context['technicals'].get('rsi', 'N/A')}
-        - MACD: {context['technicals'].get('macd', 'N/A')}
-        - Support: ${context['technicals'].get('support', 'N/A')}
-        - Resistance: ${context['technicals'].get('resistance', 'N/A')}
+WHEN TO SELL (be selective):
+- Thesis fundamentally broken (company issues, not just price)
+- Major technical breakdown with heavy volume (not normal pullback)
+- Better opportunity requiring capital reallocation
+- Position reaches predetermined stop loss (-20% to -25%)
 
-        NEWS SENTIMENT (News API + Finnhub):
-        - Articles: {len(context['news'].get('articles', []))}
-        - Sentiment: {context['news'].get('sentiment', {}).get('label', 'Neutral')}
-        - Catalyst: {context['news'].get('catalyst_detected', False)}
+WHEN TO ADD (be aggressive):
+- Market strong but stock weak = dip buying opportunity
+- Positive catalysts + temporary pullback = add to winners
+- Strong thesis + technical oversold (RSI <30) = scale in
+- Insider buying during weakness = high conviction add
 
-        INSIDER ACTIVITY (SEC):
-        - Recent Buys: {len(context['insider_activity'].get('recent_buys', []))}
-        - Recent Sells: {len(context['insider_activity'].get('recent_sells', []))}
-        - Net: {context['insider_activity'].get('signal', 'Neutral')}
+ANALYSIS STYLE:
+- Focus on WHY it's moving (catalyst, sector rotation, technical), not just THAT it's moving
+- Distinguish between noise (intraday volatility) and signal (trend change)
+- Always provide specific price levels for adds/trims/stops
+- Emphasize opportunity cost of selling too early vs. protecting capital
 
-        OPTIONS FLOW (Polygon):
-        - Unusual Activity: {context['options_flow'].get('unusual', False)}
-        - Put/Call Ratio: {context['options_flow'].get('put_call_ratio', 'N/A')}
+CURRENT MARKET: If market regime is BULLISH and stock is down, default to "hold/add" unless clear fundamental deterioration."""
 
-        MARKET REGIME: {regime['trend']} with {regime['volatility']} volatility
+        # USER PROMPT - The specific analysis request
+        user_prompt = f"""
+Analyze this position using comprehensive market data:
 
-        Provide a 2-3 sentence actionable analysis. Be specific about levels and actions.
-        """
+POSITION: {position['symbol']} - {position['shares']} shares @ ${position['entry']:.2f}
+Current: ${position['current']:.2f} ({position['pnl_pct']:+.2f}%)
+
+FUNDAMENTALS (FMP):
+- P/E: {context['fundamentals'].get('pe_ratio', 'N/A')}
+- Revenue Growth: {context['fundamentals'].get('revenue_growth', 'N/A')}
+- Insider Ownership: {context['fundamentals'].get('insider_ownership', 'N/A')}
+
+TECHNICALS (Alpha Vantage):
+- RSI: {context['technicals'].get('rsi', 'N/A')}
+- MACD: {context['technicals'].get('macd', 'N/A')}
+- Support: ${context['technicals'].get('support', 'N/A')}
+- Resistance: ${context['technicals'].get('resistance', 'N/A')}
+
+NEWS SENTIMENT (News API + Finnhub):
+- Articles: {len(context['news'].get('articles', []))}
+- Sentiment: {context['news'].get('sentiment', {}).get('label', 'Neutral')}
+- Score: {context['news'].get('sentiment', {}).get('score', 0):.2f}
+- Catalyst: {context['news'].get('catalyst_detected', False)}
+
+INSIDER ACTIVITY (SEC):
+- Recent Buys: {len(context['insider_activity'].get('recent_buys', []))}
+- Recent Sells: {len(context['insider_activity'].get('recent_sells', []))}
+- Net Signal: {context['insider_activity'].get('signal', 'Neutral')}
+
+OPTIONS FLOW (Polygon):
+- Unusual Activity: {context['options_flow'].get('unusual', False)}
+- Put/Call Ratio: {context['options_flow'].get('put_call_ratio', 'N/A')}
+
+MARKET REGIME: {regime['trend']} with {regime['volatility']} volatility, {regime['breadth']} breadth
+
+Provide 2-3 sentence actionable analysis with specific price levels. Consider if this is a HOLD/ADD opportunity or genuine concern."""
 
         response = await self.claude.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt}]
+            max_tokens=250,  # Increased for more detailed aggressive analysis
+            system=system_prompt,  # Add the aggressive momentum trader personality
+            messages=[{"role": "user", "content": user_prompt}]
         )
 
         return response.content[0].text
@@ -185,6 +223,109 @@ class EnhancedReportGenerator:
 
         # Return top 5
         return sorted(all_opportunities, key=lambda x: x['score'], reverse=True)[:5]
+
+    async def _scan_contrarian_opportunities(self, portfolio_data: Dict, regime: Dict) -> List[Dict]:
+        """
+        Identify buying opportunities when market is strong but your stocks are weak.
+        This is where the best entries happen - aggressive dip buying in bull markets!
+        """
+        if regime['trend'] != 'BULLISH':
+            return []  # Only look for contrarian buys in bull markets
+
+        opportunities = []
+
+        for position in portfolio_data['positions']:
+            ticker = position['symbol']
+            current_price = position['current']
+            entry_price = position['entry']
+            pnl_pct = position['pnl_pct']
+
+            # Calculate day change (approximate from current data)
+            # If you have real-time day change, use that instead
+            day_change = ((current_price - entry_price) / entry_price) * 100
+
+            # Criteria: Market strong + Stock weak + Good fundamentals
+            if day_change < -3 or pnl_pct < -5:  # Down 3%+ today OR down 5%+ overall
+                try:
+                    # Get context
+                    news = await self.market.get_comprehensive_news([ticker])
+                    ticker_news = news.get(ticker, {})
+                    sentiment = ticker_news.get('sentiment', {})
+
+                    insider = await self.market.get_insider_activity([ticker])
+                    ticker_insider = insider.get(ticker, {})
+
+                    technicals = await self.market.get_technicals_alpha_vantage(ticker)
+                    rsi = technicals.get('rsi')
+
+                    # BUYING SIGNAL: Down on no bad news + oversold + no insider selling
+                    is_oversold = rsi and rsi < 35
+                    no_bad_news = sentiment.get('label') != 'NEGATIVE'
+                    no_insider_selling = ticker_insider.get('signal') != 'BEARISH'
+                    has_positive_catalyst = ticker_news.get('catalyst_detected', False)
+
+                    if is_oversold and no_bad_news and no_insider_selling:
+                        support_level = current_price * 0.97  # 3% below current
+                        add_level = current_price * 0.95      # 5% below current (better entry)
+
+                        opportunities.append({
+                            'ticker': ticker,
+                            'type': 'DIP_BUY',
+                            'current_price': current_price,
+                            'day_change': day_change,
+                            'pnl_pct': pnl_pct,
+                            'rsi': rsi,
+                            'sentiment': sentiment.get('label', 'NEUTRAL'),
+                            'sentiment_score': sentiment.get('score', 0),
+                            'has_catalyst': has_positive_catalyst,
+                            'insider_signal': ticker_insider.get('signal', 'NEUTRAL'),
+                            'reason': f"Market BULLISH but {ticker} down {pnl_pct:.1f}% with RSI {rsi:.0f}. "
+                                     f"{'Positive catalyst detected! ' if has_positive_catalyst else ''}"
+                                     f"No negative catalysts - HIGH CONVICTION dip buy.",
+                            'action': f"ADD 20-30% to position at ${add_level:.2f} if it holds ${support_level:.2f} support",
+                            'score': self._score_contrarian_opportunity(
+                                rsi, sentiment.get('score', 0), has_positive_catalyst,
+                                ticker_insider.get('signal', 'NEUTRAL')
+                            )
+                        })
+                except Exception as e:
+                    print(f"Error analyzing contrarian opportunity for {ticker}: {e}")
+                    continue
+
+        # Return sorted by score (highest conviction first)
+        return sorted(opportunities, key=lambda x: x['score'], reverse=True)
+
+    def _score_contrarian_opportunity(self, rsi: float, sentiment_score: float,
+                                     has_catalyst: bool, insider_signal: str) -> float:
+        """
+        Score contrarian opportunities (higher = better buy)
+        """
+        score = 0.0
+
+        # RSI scoring (lower RSI = higher score for dip buying)
+        if rsi:
+            if rsi < 25:      # Extremely oversold
+                score += 0.4
+            elif rsi < 30:    # Very oversold
+                score += 0.3
+            elif rsi < 35:    # Oversold
+                score += 0.2
+
+        # Sentiment scoring (positive sentiment during weakness = strong buy)
+        if sentiment_score > 0.5:
+            score += 0.3
+        elif sentiment_score > 0:
+            score += 0.15
+
+        # Catalyst boost
+        if has_catalyst:
+            score += 0.2
+
+        # Insider activity
+        if insider_signal == 'BULLISH':
+            score += 0.1
+
+        return min(score, 1.0)
 
     async def _score_opportunity(self, opportunity: Dict) -> float:
         """
@@ -306,6 +447,38 @@ class EnhancedReportGenerator:
         )
 
         return response.content[0].text
+
+    def _format_contrarian_opportunities(self, opportunities: List[Dict]) -> str:
+        """Format contrarian dip-buy opportunities"""
+        if not opportunities:
+            return "**No contrarian opportunities detected.**\n\nMarket regime not bullish or all positions performing well."
+
+        output = ["**🚀 AGGRESSIVE DIP-BUY SIGNALS - Market Strong, Your Stocks Weak**\n"]
+
+        for i, opp in enumerate(opportunities, 1):
+            ticker = opp['ticker']
+            score = opp['score']
+            rsi = opp['rsi']
+            sentiment = opp['sentiment']
+            pnl_pct = opp['pnl_pct']
+            has_catalyst = opp.get('has_catalyst', False)
+
+            # Emoji based on conviction score
+            if score > 0.7:
+                emoji = "🔥🔥🔥"  # Highest conviction
+            elif score > 0.5:
+                emoji = "🔥🔥"    # High conviction
+            else:
+                emoji = "🔥"      # Good conviction
+
+            output.append(f"**{i}. {ticker}** {emoji} (Conviction: {score:.0%})")
+            output.append(f"   - **Position**: Down {pnl_pct:.1f}% | RSI: {rsi:.0f} (OVERSOLD)")
+            output.append(f"   - **Sentiment**: {sentiment} | {'✅ Catalyst Detected!' if has_catalyst else 'No negative news'}")
+            output.append(f"   - **Signal**: {opp['reason']}")
+            output.append(f"   - **🎯 ACTION**: {opp['action']}")
+            output.append("")
+
+        return "\n".join(output)
 
     def _format_sector_performance(self, sectors: Dict) -> str:
         """Format sector performance data"""
