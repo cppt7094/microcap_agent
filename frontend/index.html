@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Tehama - Microcap Trading Intelligence</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React 18 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+        }
+        .card-glow {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
+        }
+        .card-glow:hover {
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const API_BASE = 'http://localhost:8000';
+
+        // Market-aware helper functions
+        const getETTime = () => {
+            const now = new Date();
+            // Convert to ET timezone
+            return new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+        };
+
+        const isMarketOpen = () => {
+            const et = getETTime();
+            const day = et.getDay(); // 0 = Sunday, 6 = Saturday
+            const hour = et.getHours();
+            const minute = et.getMinutes();
+
+            // Weekend check
+            if (day === 0 || day === 6) return false;
+
+            // Before market open (before 9:30 AM)
+            if (hour < 9 || (hour === 9 && minute < 30)) return false;
+
+            // After market close (after 4:00 PM)
+            if (hour >= 16) return false;
+
+            return true;
+        };
+
+        const getRefreshInterval = () => {
+            const et = getETTime();
+            const day = et.getDay();
+
+            // Weekend: 5 minutes
+            if (day === 0 || day === 6) return 300000;
+
+            // Market hours: 30 seconds
+            if (isMarketOpen()) return 30000;
+
+            // After hours (weekday): 2 minutes
+            return 120000;
+        };
+
+        // Icon Components
+        const TrendingUp = () => <i data-lucide="trending-up" className="w-5 h-5"></i>;
+        const TrendingDown = () => <i data-lucide="trending-down" className="w-5 h-5"></i>;
+        const Activity = () => <i data-lucide="activity" className="w-5 h-5"></i>;
+        const Bell = () => <i data-lucide="bell" className="w-5 h-5"></i>;
+        const Brain = () => <i data-lucide="brain" className="w-5 h-5"></i>;
+        const Wallet = () => <i data-lucide="wallet" className="w-5 h-5"></i>;
+        const AlertCircle = () => <i data-lucide="alert-circle" className="w-5 h-5"></i>;
+        const RefreshCw = () => <i data-lucide="refresh-cw" className="w-5 h-5"></i>;
+        const CheckCircle = () => <i data-lucide="check-circle" className="w-5 h-5"></i>;
+
+        // Portfolio Tab Component
+        const PortfolioTab = ({ data, loading, error, isUpdating }) => {
+            if (loading) return <LoadingState message="Loading portfolio..." />;
+            if (error) return <ErrorState message={error} />;
+            if (!data) return null;
+
+            return (
+                <div className="space-y-6">
+                    {/* Portfolio Summary */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <StatCard
+                            title="Total Value"
+                            value={`$${data.total_value.toFixed(2)}`}
+                            icon={<Wallet />}
+                            color="blue"
+                            isUpdating={isUpdating}
+                        />
+                        <StatCard
+                            title="Cash"
+                            value={`$${data.cash.toFixed(2)}`}
+                            icon={<Activity />}
+                            color="green"
+                            isUpdating={isUpdating}
+                        />
+                        <StatCard
+                            title="Daily Change"
+                            value={`$${data.daily_change.toFixed(2)}`}
+                            icon={data.daily_change >= 0 ? <TrendingUp /> : <TrendingDown />}
+                            color={data.daily_change >= 0 ? "green" : "red"}
+                            isUpdating={isUpdating}
+                        />
+                        <StatCard
+                            title="Daily Change %"
+                            value={`${data.daily_change_pct.toFixed(2)}%`}
+                            icon={data.daily_change_pct >= 0 ? <TrendingUp /> : <TrendingDown />}
+                            color={data.daily_change_pct >= 0 ? "green" : "red"}
+                            isUpdating={isUpdating}
+                        />
+                    </div>
+
+                    {/* Positions Table */}
+                    <div className="bg-slate-800 rounded-lg p-6 card-glow">
+                        <h3 className="text-xl font-bold text-white mb-4">Positions</h3>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="border-b border-slate-700">
+                                        <th className="pb-3 text-slate-400 font-semibold">Ticker</th>
+                                        <th className="pb-3 text-slate-400 font-semibold">Qty</th>
+                                        <th className="pb-3 text-slate-400 font-semibold">Avg Entry</th>
+                                        <th className="pb-3 text-slate-400 font-semibold">Current Price</th>
+                                        <th className="pb-3 text-slate-400 font-semibold">Market Value</th>
+                                        <th className="pb-3 text-slate-400 font-semibold">Unrealized P/L</th>
+                                        <th className="pb-3 text-slate-400 font-semibold">Daily Change</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {data.positions.map((pos, idx) => (
+                                        <tr key={idx} className="border-b border-slate-700/50">
+                                            <td className="py-3 text-white font-bold">{pos.ticker}</td>
+                                            <td className="py-3 text-slate-300">{pos.qty}</td>
+                                            <td className="py-3 text-slate-300">${pos.avg_entry_price.toFixed(2)}</td>
+                                            <td className="py-3 text-slate-300">${pos.current_price.toFixed(2)}</td>
+                                            <td className="py-3 text-slate-300">${pos.market_value.toFixed(2)}</td>
+                                            <td className={`py-3 font-semibold ${pos.unrealized_plpc >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                {pos.unrealized_plpc >= 0 ? '+' : ''}{pos.unrealized_plpc.toFixed(2)}%
+                                            </td>
+                                            <td className={`py-3 font-semibold ${pos.daily_change_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                {pos.daily_change_pct >= 0 ? '+' : ''}{pos.daily_change_pct.toFixed(2)}%
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Recommendations Tab Component
+        const RecommendationsTab = ({ data, loading, error }) => {
+            if (loading) return <LoadingState message="Loading recommendations..." />;
+            if (error) return <ErrorState message={error} />;
+            if (!data || data.length === 0) return <EmptyState message="No recommendations available" />;
+
+            return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {data.map((rec) => (
+                        <div key={rec.id} className="bg-slate-800 rounded-lg p-6 card-glow">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 className="text-2xl font-bold text-white">{rec.ticker}</h3>
+                                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold mt-2 ${
+                                        rec.action === 'BUY' || rec.action === 'ADD' ? 'bg-green-900/50 text-green-400' :
+                                        rec.action === 'SELL' || rec.action === 'TRIM' ? 'bg-red-900/50 text-red-400' :
+                                        'bg-blue-900/50 text-blue-400'
+                                    }`}>
+                                        {rec.action}
+                                    </span>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-slate-400 text-sm">Confidence</div>
+                                    <div className="text-2xl font-bold text-blue-400">{(rec.confidence * 100).toFixed(0)}%</div>
+                                </div>
+                            </div>
+
+                            {rec.qty && (
+                                <div className="mb-2 text-slate-300">
+                                    <span className="text-slate-400">Quantity:</span> {rec.qty} shares
+                                </div>
+                            )}
+
+                            {rec.target_price && (
+                                <div className="mb-4 text-slate-300">
+                                    <span className="text-slate-400">Target Price:</span> ${rec.target_price.toFixed(2)}
+                                </div>
+                            )}
+
+                            <p className="text-slate-300 text-sm mb-4">{rec.reasoning}</p>
+
+                            <div className="border-t border-slate-700 pt-3">
+                                <div className="text-slate-400 text-xs mb-2">Contributing Agents:</div>
+                                <div className="flex flex-wrap gap-2">
+                                    {rec.agents.map((agent, idx) => (
+                                        <span key={idx} className="bg-slate-700 px-2 py-1 rounded text-xs text-slate-300">
+                                            {agent}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        // Agents Tab Component
+        const AgentsTab = ({ data, loading, error }) => {
+            if (loading) return <LoadingState message="Loading agent status..." />;
+            if (error) return <ErrorState message={error} />;
+            if (!data) return null;
+
+            return (
+                <div className="space-y-6">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <StatCard
+                            title="Total Agents"
+                            value={data.summary.total_agents}
+                            icon={<Brain />}
+                            color="purple"
+                        />
+                        <StatCard
+                            title="Active Agents"
+                            value={data.summary.active_agents}
+                            icon={<CheckCircle />}
+                            color="green"
+                        />
+                        <StatCard
+                            title="System Health"
+                            value={data.summary.system_health}
+                            icon={<Activity />}
+                            color="blue"
+                        />
+                        <StatCard
+                            title="Status"
+                            value="Operational"
+                            icon={<CheckCircle />}
+                            color="green"
+                        />
+                    </div>
+
+                    {/* Agent Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {data.agents.map((agent, idx) => (
+                            <div key={idx} className="bg-slate-800 rounded-lg p-6 card-glow">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-white capitalize">
+                                            {agent.name.replace('_', ' ')}
+                                        </h3>
+                                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold mt-1 ${
+                                            agent.status === 'active' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'
+                                        }`}>
+                                            {agent.status}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 text-sm">
+                                    <div className="text-slate-400">
+                                        Last Run: <span className="text-slate-300">{new Date(agent.last_run).toLocaleTimeString()}</span>
+                                    </div>
+
+                                    {agent.positions_analyzed !== undefined && (
+                                        <div className="text-slate-400">
+                                            Positions Analyzed: <span className="text-slate-300">{agent.positions_analyzed}</span>
+                                        </div>
+                                    )}
+
+                                    {agent.recommendations_generated !== undefined && (
+                                        <div className="text-slate-400">
+                                            Recommendations: <span className="text-slate-300">{agent.recommendations_generated}</span>
+                                        </div>
+                                    )}
+
+                                    {agent.news_articles_analyzed !== undefined && (
+                                        <div className="text-slate-400">
+                                            Articles Analyzed: <span className="text-slate-300">{agent.news_articles_analyzed}</span>
+                                        </div>
+                                    )}
+
+                                    {agent.market_regime !== undefined && (
+                                        <div className="text-slate-400">
+                                            Market Regime: <span className="text-green-400 font-semibold">{agent.market_regime}</span>
+                                        </div>
+                                    )}
+
+                                    {agent.confidence !== undefined && (
+                                        <div className="text-slate-400">
+                                            Confidence: <span className="text-slate-300">{(agent.confidence * 100).toFixed(0)}%</span>
+                                        </div>
+                                    )}
+
+                                    {agent.catalysts_detected !== undefined && (
+                                        <div className="text-slate-400">
+                                            Catalysts Detected: <span className="text-slate-300">{agent.catalysts_detected}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Alerts Tab Component
+        const AlertsTab = ({ data, loading, error }) => {
+            if (loading) return <LoadingState message="Loading alerts..." />;
+            if (error) return <ErrorState message={error} />;
+            if (!data || data.length === 0) return <EmptyState message="No alerts" />;
+
+            return (
+                <div className="space-y-4">
+                    {data.map((alert, idx) => (
+                        <div key={idx} className={`bg-slate-800 rounded-lg p-6 card-glow border-l-4 ${
+                            alert.severity === 'critical' ? 'border-red-500' :
+                            alert.severity === 'warning' ? 'border-yellow-500' :
+                            'border-blue-500'
+                        }`}>
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                            alert.severity === 'critical' ? 'bg-red-900/50 text-red-400' :
+                                            alert.severity === 'warning' ? 'bg-yellow-900/50 text-yellow-400' :
+                                            'bg-blue-900/50 text-blue-400'
+                                        }`}>
+                                            {alert.type}
+                                        </span>
+                                        {alert.ticker && (
+                                            <span className="text-white font-bold">{alert.ticker}</span>
+                                        )}
+                                        <span className="text-slate-400 text-sm">
+                                            {new Date(alert.timestamp).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <p className="text-slate-300">{alert.message}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        // Utility Components
+        const StatCard = ({ title, value, icon, color, isUpdating }) => {
+            const colorClasses = {
+                blue: 'bg-blue-900/30 text-blue-400',
+                green: 'bg-green-900/30 text-green-400',
+                red: 'bg-red-900/30 text-red-400',
+                purple: 'bg-purple-900/30 text-purple-400'
+            };
+
+            return (
+                <div className={`bg-slate-800 rounded-lg p-6 card-glow transition-all ${
+                    isUpdating ? 'ring-2 ring-blue-400/50' : ''
+                }`}>
+                    <div className="flex items-center justify-between mb-2">
+                        <div className={`p-2 rounded ${colorClasses[color]}`}>
+                            {icon}
+                        </div>
+                    </div>
+                    <div className="text-slate-400 text-sm">{title}</div>
+                    <div className="text-2xl font-bold text-white mt-1">{value}</div>
+                </div>
+            );
+        };
+
+        const LoadingState = ({ message }) => (
+            <div className="flex flex-col items-center justify-center py-20">
+                <RefreshCw className="animate-spin mb-4" />
+                <div className="text-slate-400">{message}</div>
+            </div>
+        );
+
+        const ErrorState = ({ message }) => (
+            <div className="bg-red-900/20 border border-red-500 rounded-lg p-6 text-center">
+                <AlertCircle className="mx-auto mb-4 text-red-400" />
+                <div className="text-red-400">{message}</div>
+            </div>
+        );
+
+        const EmptyState = ({ message }) => (
+            <div className="bg-slate-800 rounded-lg p-12 text-center">
+                <div className="text-slate-400">{message}</div>
+            </div>
+        );
+
+        // Main Dashboard Component
+        const Dashboard = () => {
+            const [activeTab, setActiveTab] = useState('portfolio');
+            const [portfolio, setPortfolio] = useState(null);
+            const [recommendations, setRecommendations] = useState(null);
+            const [agents, setAgents] = useState(null);
+            const [alerts, setAlerts] = useState(null);
+            const [loading, setLoading] = useState({
+                portfolio: true,
+                recommendations: true,
+                agents: true,
+                alerts: true
+            });
+            const [errors, setErrors] = useState({});
+            const [lastUpdate, setLastUpdate] = useState(new Date());
+            const [nextRefresh, setNextRefresh] = useState(Math.floor(getRefreshInterval() / 1000));
+            const [isRefreshing, setIsRefreshing] = useState(false);
+            const [isUpdating, setIsUpdating] = useState(false);
+
+            const fetchData = async () => {
+                setIsRefreshing(true);
+                setIsUpdating(true);
+
+                const endpoints = [
+                    { name: 'portfolio', url: '/api/portfolio', setter: setPortfolio },
+                    { name: 'recommendations', url: '/api/recommendations', setter: setRecommendations },
+                    { name: 'agents', url: '/api/agents/status', setter: setAgents },
+                    { name: 'alerts', url: '/api/alerts', setter: setAlerts }
+                ];
+
+                for (const endpoint of endpoints) {
+                    try {
+                        const response = await fetch(`${API_BASE}${endpoint.url}`);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        const data = await response.json();
+                        endpoint.setter(data);
+                        setErrors(prev => ({ ...prev, [endpoint.name]: null }));
+                    } catch (error) {
+                        console.error(`Error fetching ${endpoint.name}:`, error);
+                        setErrors(prev => ({ ...prev, [endpoint.name]: `Failed to load ${endpoint.name}` }));
+                    } finally {
+                        setLoading(prev => ({ ...prev, [endpoint.name]: false }));
+                    }
+                }
+
+                setLastUpdate(new Date());
+                setIsRefreshing(false);
+
+                // Flash effect for 500ms
+                setTimeout(() => setIsUpdating(false), 500);
+            };
+
+            const handleManualRefresh = async () => {
+                if (isRefreshing) return; // Prevent double-clicks
+                await fetchData();
+                setNextRefresh(Math.floor(getRefreshInterval() / 1000));
+            };
+
+            // Dynamic refresh interval effect
+            useEffect(() => {
+                fetchData();
+                const interval = getRefreshInterval();
+                const timer = setInterval(() => {
+                    fetchData();
+                }, interval);
+
+                return () => clearInterval(timer);
+            }, []);
+
+            // Countdown timer effect
+            useEffect(() => {
+                const interval = getRefreshInterval();
+                setNextRefresh(Math.floor(interval / 1000));
+
+                const countdownTimer = setInterval(() => {
+                    setNextRefresh(prev => {
+                        if (prev <= 1) {
+                            return Math.floor(getRefreshInterval() / 1000);
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+
+                return () => clearInterval(countdownTimer);
+            }, []);
+
+            useEffect(() => {
+                lucide.createIcons();
+            });
+
+            const tabs = [
+                { id: 'portfolio', name: 'Portfolio', icon: <Wallet /> },
+                { id: 'recommendations', name: 'Recommendations', icon: <Brain /> },
+                { id: 'agents', name: 'Agents', icon: <Activity /> },
+                { id: 'alerts', name: 'Alerts', icon: <Bell /> }
+            ];
+
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Header */}
+                        <div className="mb-8 flex justify-between items-start">
+                            <div>
+                                <h1 className="text-4xl font-bold text-white mb-2">Project Tehama</h1>
+                                <p className="text-slate-400">Real-time Microcap Trading Intelligence</p>
+                            </div>
+
+                            {/* Refresh Controls */}
+                            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                                <div className="flex items-center gap-4">
+                                    <div>
+                                        <div className="text-xs text-slate-500 mb-1">Market Status</div>
+                                        <div className={`text-sm font-semibold ${
+                                            isMarketOpen() ? 'text-green-400' : 'text-slate-400'
+                                        }`}>
+                                            {isMarketOpen() ? '● OPEN' : '○ CLOSED'}
+                                        </div>
+                                    </div>
+
+                                    <div className="border-l border-slate-700 pl-4">
+                                        <div className="text-xs text-slate-500 mb-1">Last Update</div>
+                                        <div className="text-sm text-slate-300">
+                                            {lastUpdate.toLocaleTimeString('en-US', {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                second: '2-digit',
+                                                timeZone: 'America/New_York'
+                                            })} ET
+                                        </div>
+                                    </div>
+
+                                    <div className="border-l border-slate-700 pl-4">
+                                        <div className="text-xs text-slate-500 mb-1">Next Refresh</div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-slate-300 font-mono">
+                                                {Math.floor(nextRefresh / 60)}:{(nextRefresh % 60).toString().padStart(2, '0')}
+                                            </span>
+                                            <button
+                                                onClick={handleManualRefresh}
+                                                disabled={isRefreshing}
+                                                className={`p-2 rounded-lg transition-all ${
+                                                    isRefreshing
+                                                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                                        : 'bg-slate-700 hover:bg-slate-600 text-blue-400 hover:text-blue-300'
+                                                }`}
+                                                title="Refresh Now"
+                                            >
+                                                <i data-lucide="refresh-cw" className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`}></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="bg-slate-800 rounded-lg p-2 mb-6 flex flex-wrap gap-2">
+                            {tabs.map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+                                        activeTab === tab.id
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                                    }`}
+                                >
+                                    {tab.icon}
+                                    <span>{tab.name}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Tab Content */}
+                        <div>
+                            {activeTab === 'portfolio' && (
+                                <PortfolioTab data={portfolio} loading={loading.portfolio} error={errors.portfolio} isUpdating={isUpdating} />
+                            )}
+                            {activeTab === 'recommendations' && (
+                                <RecommendationsTab data={recommendations} loading={loading.recommendations} error={errors.recommendations} />
+                            )}
+                            {activeTab === 'agents' && (
+                                <AgentsTab data={agents} loading={loading.agents} error={errors.agents} />
+                            )}
+                            {activeTab === 'alerts' && (
+                                <AlertsTab data={alerts} loading={loading.alerts} error={errors.alerts} />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Render App
+        ReactDOM.createRoot(document.getElementById('root')).render(<Dashboard />);
+    </script>
+</body>
+</html>

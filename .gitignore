@@ -80,3 +80,11 @@ htmlcov/
 # Jupyter Notebook
 .ipynb_checkpoints
 nul
+
+# API usage tracking and opportunity cache
+api_usage.json
+opportunities_latest.json
+simple_cache.json
+
+# Any generated JSON data files
+*_latest.json

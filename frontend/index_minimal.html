@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tehama Minimal Test</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        const App = () => {
+            const [count, setCount] = useState(0);
+
+            return (
+                <div className="min-h-screen text-white p-8">
+                    <h1 className="text-4xl font-bold mb-4">Project Tehama - Minimal Test</h1>
+                    <div className="bg-slate-800 rounded-xl p-6 space-y-4">
+                        <p className="text-2xl">Portfolio: $939.49</p>
+                        <p className="text-lg">React Counter Test: {count}</p>
+                        <button
+                            onClick={() => setCount(count + 1)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                        >
+                            Refresh ({count})
+                        </button>
+                        <div className="mt-4 text-green-400 text-sm">
+                            ✓ React 18 is rendering correctly!
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // React 18 syntax
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

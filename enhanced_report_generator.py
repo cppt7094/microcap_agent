@@ -1,11 +1,16 @@
 """
 Enhanced Report Generator using existing Project Tehama infrastructure
+
+Integrates with the Brutal Honesty Framework to ensure all AI-generated
+analysis is direct, actionable, and challenges user biases rather than
+validating them.
 """
 import asyncio
 from datetime import datetime
 from typing import Dict, List, Any
 import os
 from anthropic import AsyncAnthropic
+from agents.core_directives import get_agent_directive
 
 
 class EnhancedReportGenerator:
@@ -189,10 +194,14 @@ MARKET REGIME: {regime['trend']} with {regime['volatility']} volatility, {regime
 
 Provide 2-3 sentence actionable analysis with specific price levels. Consider if this is a HOLD/ADD opportunity or genuine concern."""
 
+        # Use brutal honesty framework for risk management analysis
+        risk_directive = get_agent_directive("risk")
+        combined_system = f"{risk_directive}\n\n{system_prompt}"
+
         response = await self.claude.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=250,  # Increased for more detailed aggressive analysis
-            system=system_prompt,  # Add the aggressive momentum trader personality
+            system=combined_system,  # Brutal honesty + personality
             messages=[{"role": "user", "content": user_prompt}]
         )
 
@@ -413,11 +422,16 @@ Provide 2-3 sentence actionable analysis with specific price levels. Consider if
         TOP OPPORTUNITIES FOUND: {len(opportunities)}
 
         Focus on: Today's key action items, market context, and biggest opportunities/risks.
+        Be direct and actionable. No hedging language.
         """
+
+        # Use technical analyst directive for market analysis
+        technical_directive = get_agent_directive("technical")
 
         response = await self.claude.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=250,
+            system=technical_directive,  # Brutal honesty framework
             messages=[{"role": "user", "content": prompt}]
         )
 
@@ -438,11 +452,17 @@ Provide 2-3 sentence actionable analysis with specific price levels. Consider if
 
         Focus on: Immediate actions, position management, new entry opportunities, risk management.
         Be specific with tickers and price levels where possible.
+        Use clear action verbs (BUY, SELL, HOLD, CUT, ADD, WATCH).
+        No hedging - be direct about what to do.
         """
+
+        # Use risk manager directive for action planning
+        risk_directive = get_agent_directive("risk")
 
         response = await self.claude.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=300,
+            system=risk_directive,  # Brutal honesty framework
             messages=[{"role": "user", "content": prompt}]
         )
 

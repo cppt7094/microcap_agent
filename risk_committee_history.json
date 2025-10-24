@@ -1,0 +1,70 @@
+[
+  {
+    "timestamp": "2025-10-23T00:27:50.412414Z",
+    "original_rec": "BUY 5 APLD @ $36.28",
+    "risk_seeking": "BUY 8 shares - Confidence 85% justifies 30% position. Let winners run.",
+    "risk_neutral": "BUY 4 shares - Standard 18% sizing appropriate for 85% confidence.",
+    "risk_conservative": "BUY 3 shares - Conservative 12% sizing preserves capital and diversification.",
+    "consensus": "BUY 4 shares",
+    "reasoning": "**CONSENSUS DECISION:**\n\nThe core debate centers on whether 85% confidence justifies aggressive sizing (30%) to maximize gains from strong momentum, versus maintaining prudent risk management given the already elevated 35% sector exposure. Risk-Seeking argues for capitalizing on high-conviction opportunities, while Risk-Conservative emphasizes portfolio balance and capital preservation. Risk-Neutral's 18% proposal offers reasonable middle ground but doesn't adequately address the sector concentration risk.\n\n**FINAL RECOMMENDATION:** 15% position size with 12% stop loss. This balances the high conviction level while respecting existing sector exposure limits and maintaining proper diversification.",
+    "stop_loss": "$31.93 (-12%)",
+    "winner": "Risk-Neutral",
+    "proposals": {
+      "seeking": {
+        "agent": "Risk-Seeking",
+        "proposed_qty": 8,
+        "position_pct": 30.0,
+        "stop_loss_pct": -25.0,
+        "reasoning_preview": "Confidence 85% justifies 30% position. Let winners run."
+      },
+      "neutral": {
+        "agent": "Risk-Neutral",
+        "proposed_qty": 4,
+        "position_pct": 18.0,
+        "stop_loss_pct": -20.0,
+        "reasoning_preview": "Standard 18% sizing appropriate for 85% confidence."
+      },
+      "conservative": {
+        "agent": "Risk-Conservative",
+        "proposed_qty": 3,
+        "position_pct": 12.0,
+        "stop_loss_pct": -15.0,
+        "reasoning_preview": "Conservative 12% sizing preserves capital and diversification."
+      }
+    }
+  },
+  {
+    "timestamp": "2025-10-24T18:27:46.107689Z",
+    "original_rec": "SELL 5 APLD @ $33.15",
+    "risk_seeking": "SELL 4 shares - Confidence 50% justifies 15% position. Let winners run.",
+    "risk_neutral": "SELL 3 shares - Standard 12% sizing appropriate for 50% confidence.",
+    "risk_conservative": "SELL 3 shares - Conservative 10% sizing preserves capital and diversification.",
+    "consensus": "SELL 3 shares",
+    "reasoning": "**CONSENSUS DECISION:**\n\nThe core debate centers on whether 50% confidence warrants standard sizing or requires conservative adjustment, with agents split between capital preservation versus opportunity capture. Given the moderate confidence level and current zero sector exposure, the balanced approach prevails. \n\n**Position Size: $110 (11% allocation)**\n**Stop Loss: 8%**\n\nThis sizing splits the difference between conservative capital protection and moderate conviction, while the 8% stop loss provides downside protection without being overly tight for a SELL recommendation with mixed agent sentiment.",
+    "stop_loss": "$30.50 (-8%)",
+    "winner": "Risk-Neutral",
+    "proposals": {
+      "seeking": {
+        "agent": "Risk-Seeking",
+        "proposed_qty": 4,
+        "position_pct": 15.0,
+        "stop_loss_pct": -25.0,
+        "reasoning_preview": "Confidence 50% justifies 15% position. Let winners run."
+      },
+      "neutral": {
+        "agent": "Risk-Neutral",
+        "proposed_qty": 3,
+        "position_pct": 12.0,
+        "stop_loss_pct": -20.0,
+        "reasoning_preview": "Standard 12% sizing appropriate for 50% confidence."
+      },
+      "conservative": {
+        "agent": "Risk-Conservative",
+        "proposed_qty": 3,
+        "position_pct": 10.0,
+        "stop_loss_pct": -15.0,
+        "reasoning_preview": "Conservative 10% sizing preserves capital and diversification."
+      }
+    }
+  }
+]

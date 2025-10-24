@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1e293b;
+            color: white;
+        }
+        .test-box {
+            background: #334155;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Diagnostic Test Page</h1>
+
+    <div class="test-box">
+        <h2>Test 1: Basic HTML</h2>
+        <p class="success">✓ If you can see this, basic HTML is working</p>
+    </div>
+
+    <div class="test-box">
+        <h2>Test 2: JavaScript</h2>
+        <p id="js-test" class="error">✗ JavaScript not working</p>
+    </div>
+
+    <div class="test-box">
+        <h2>Test 3: API Connection</h2>
+        <p id="api-test">Testing...</p>
+        <pre id="api-result" style="background: #1e293b; padding: 10px; border-radius: 4px;"></pre>
+    </div>
+
+    <div class="test-box">
+        <h2>Test 4: CDN Resources</h2>
+        <p id="react-test">Testing React...</p>
+        <p id="tailwind-test">Testing Tailwind...</p>
+    </div>
+
+    <script>
+        // Test 2: Basic JavaScript
+        document.getElementById('js-test').innerHTML = '<span class="success">✓ JavaScript is working</span>';
+
+        // Test 3: API Connection
+        fetch('http://localhost:8000/api/usage')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('api-test').innerHTML = '<span class="success">✓ API is reachable</span>';
+                document.getElementById('api-result').textContent = JSON.stringify(data, null, 2).substring(0, 500) + '...';
+            })
+            .catch(error => {
+                document.getElementById('api-test').innerHTML = '<span class="error">✗ API Error: ' + error.message + '</span>';
+            });
+    </script>
+
+    <!-- Test 4: React -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        setTimeout(() => {
+            if (typeof React !== 'undefined') {
+                document.getElementById('react-test').innerHTML = '<span class="success">✓ React loaded (v' + React.version + ')</span>';
+            } else {
+                document.getElementById('react-test').innerHTML = '<span class="error">✗ React failed to load</span>';
+            }
+
+            if (typeof tailwind !== 'undefined' || document.querySelector('script[src*="tailwind"]')) {
+                document.getElementById('tailwind-test').innerHTML = '<span class="success">✓ Tailwind CSS loaded</span>';
+            } else {
+                document.getElementById('tailwind-test').innerHTML = '<span class="error">✗ Tailwind CSS failed to load</span>';
+            }
+        }, 2000);
+    </script>
+
+    <div class="test-box">
+        <h2>Next Steps</h2>
+        <p>If all tests pass, the main dashboard should work at:</p>
+        <p><a href="/" style="color: #60a5fa;">http://localhost:8000/</a></p>
+        <p style="margin-top: 20px; font-size: 14px; color: #94a3b8;">
+            If React fails to load, you may need to check your internet connection or firewall settings.
+        </p>
+    </div>
+</body>
+</html>
