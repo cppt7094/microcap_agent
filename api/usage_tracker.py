@@ -9,6 +9,7 @@ from datetime import datetime, time
 from pathlib import Path
 from typing import Dict, Optional, Literal
 import pytz
+from utils.data_paths import get_data_path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,9 +35,9 @@ class UsageTracker:
 
     def __init__(self, data_file: str = "api_usage.json"):
         """Initialize usage tracker with persistent storage"""
-        self.data_file = Path(data_file)
+        self.data_file = Path(get_data_path(data_file))
         self.data = self._load_data()
-        logger.info("UsageTracker initialized")
+        logger.info(f"UsageTracker initialized at {self.data_file}")
 
     def _get_current_date_et(self) -> str:
         """Get current date in ET timezone"""

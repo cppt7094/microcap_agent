@@ -24,6 +24,7 @@ import json
 from pathlib import Path
 import yfinance as yf
 from agents.core_directives import get_agent_directive, get_scoring_guidelines
+from utils.data_paths import get_data_path
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -89,7 +90,7 @@ class OpportunityScannerAgent:
     def _load_cached_stats(self):
         """Load scan stats from cache file if it exists."""
         try:
-            cache_file = Path("opportunities_latest.json")
+            cache_file = Path(get_data_path("opportunities_latest.json"))
             if cache_file.exists():
                 with open(cache_file, "r") as f:
                     data = json.load(f)
@@ -586,7 +587,7 @@ class OpportunityScannerAgent:
             opportunities: List of opportunity dicts to save
         """
         try:
-            cache_file = Path("opportunities_latest.json")
+            cache_file = Path(get_data_path("opportunities_latest.json"))
             data = {
                 "opportunities": opportunities,
                 "scanned_at": datetime.utcnow().isoformat() + "Z",

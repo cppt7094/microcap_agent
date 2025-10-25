@@ -18,6 +18,7 @@ from api.services import (
 from api.cache_manager import cache_manager
 from api.usage_tracker import usage_tracker
 from agents.opportunity_scanner import get_scanner
+from utils.data_paths import get_data_path
 
 # Get singleton scanner instance
 opportunity_scanner = get_scanner()
@@ -290,7 +291,7 @@ async def get_latest_opportunities(limit: int = Query(default=10, ge=1, le=50)):
         import json
         from pathlib import Path
 
-        cache_file = Path("opportunities_latest.json")
+        cache_file = Path(get_data_path("opportunities_latest.json"))
 
         if cache_file.exists():
             with open(cache_file, "r") as f:
