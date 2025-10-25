@@ -1,0 +1,14 @@
+# Nixpacks configuration for Railway
+# This overrides auto-detection to use our Procfile
+
+[phases.setup]
+nixPkgs = ["python3", "gcc"]
+
+[phases.install]
+cmds = [
+    "python -m venv --copies /opt/venv",
+    ". /opt/venv/bin/activate && pip install -r requirements.txt"
+]
+
+[start]
+cmd = "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info"
