@@ -39,6 +39,7 @@ ALPACA_SECRET_KEY=your_key_from_env_file
 ALPACA_BASE_URL=https://api.alpaca.markets
 FMP_API_KEY=your_key_from_env_file
 PORT=8000
+RAILWAY_ENVIRONMENT=production
 ```
 
 **Click "Save"**
@@ -146,6 +147,11 @@ Look for:
 
 ### Issue: Slow first request
 **Normal:** Railway apps sleep after inactivity. First request wakes it (~10 seconds).
+
+### Issue: App crashes or won't start
+**Fix:** Check Railway deployment logs for detailed error messages. See `RAILWAY_TROUBLESHOOTING.md` for complete debugging guide.
+
+**Quick debug:** Temporarily change Procfile to `web: python start_api_minimal.py` to test if basic deployment works.
 
 ---
 
