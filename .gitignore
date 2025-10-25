@@ -88,3 +88,4 @@ simple_cache.json
 
 # Any generated JSON data files
 *_latest.json
+RAILWAY_ENV_VARS.txt
