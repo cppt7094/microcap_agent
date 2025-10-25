@@ -17,11 +17,26 @@ from api.services import (
 )
 from api.cache_manager import cache_manager
 from api.usage_tracker import usage_tracker
-from agents.opportunity_scanner import get_scanner
 from utils.data_paths import get_data_path
+import logging
 
-# Get singleton scanner instance
-opportunity_scanner = get_scanner()
+logger = logging.getLogger(__name__)
+
+# Initialize scanner lazily to avoid startup failures
+opportunity_scanner = None
+
+def get_opportunity_scanner():
+    """Get or initialize the opportunity scanner (lazy loading)"""
+    global opportunity_scanner
+    if opportunity_scanner is None:
+        try:
+            from agents.opportunity_scanner import get_scanner
+            opportunity_scanner = get_scanner()
+            logger.info("Opportunity scanner initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize opportunity scanner: {e}")
+            raise
+    return opportunity_scanner
 
 # Create FastAPI app instance
 app = FastAPI(
@@ -242,17 +257,18 @@ async def scan_opportunities(
 
         # No cache, run new scan
         start_time = time.time()
-        opportunities = opportunity_scanner.scan_for_opportunities(max_results=50)
+        scanner = get_opportunity_scanner()
+        opportunities = scanner.scan_for_opportunities(max_results=50)
 
         # Filter by min_score
         filtered = [opp for opp in opportunities if opp["score"] >= min_score]
 
         result = {
             "opportunities": filtered[:limit],
-            "total_scanned": opportunity_scanner.last_scan_stats.get("tickers_scanned", 0),
+            "total_scanned": scanner.last_scan_stats.get("tickers_scanned", 0),
             "total_found": len(filtered),
-            "scan_time": opportunity_scanner.last_scan_stats.get("scan_time", "unknown"),
-            "scanned_at": opportunity_scanner.last_scan_stats.get("timestamp"),
+            "scan_time": scanner.last_scan_stats.get("scan_time", "unknown"),
+            "scanned_at": scanner.last_scan_stats.get("timestamp"),
             "cached": False
         }
 
