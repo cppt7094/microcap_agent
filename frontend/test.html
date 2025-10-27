@@ -49,7 +49,7 @@
         document.getElementById('js-test').innerHTML = '<span class="success">✓ JavaScript is working</span>';
 
         // Test 3: API Connection
-        fetch('http://localhost:8000/api/usage')
+        fetch('https://web-production-bed8.up.railway.app/api/usage')
             .then(response => response.json())
             .then(data => {
                 document.getElementById('api-test').innerHTML = '<span class="success">✓ API is reachable</span>';
@@ -84,7 +84,7 @@
     <div class="test-box">
         <h2>Next Steps</h2>
         <p>If all tests pass, the main dashboard should work at:</p>
-        <p><a href="/" style="color: #60a5fa;">http://localhost:8000/</a></p>
+        <p><a href="/" style="color: #60a5fa;">https://web-production-bed8.up.railway.app/</a></p>
         <p style="margin-top: 20px; font-size: 14px; color: #94a3b8;">
             If React fails to load, you may need to check your internet connection or firewall settings.
         </p>
