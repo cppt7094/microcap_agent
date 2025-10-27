@@ -434,14 +434,14 @@
                 setIsRefreshing(true);
                 setIsUpdating(true);
 
-                const endpoints = [
+                // Fetch portfolio, agents, and alerts normally
+                const simpleEndpoints = [
                     { name: 'portfolio', url: '/api/portfolio', setter: setPortfolio },
-                    { name: 'recommendations', url: '/api/recommendations', setter: setRecommendations },
                     { name: 'agents', url: '/api/agents/status', setter: setAgents },
                     { name: 'alerts', url: '/api/alerts', setter: setAlerts }
                 ];
 
-                for (const endpoint of endpoints) {
+                for (const endpoint of simpleEndpoints) {
                     try {
                         const response = await fetch(`${API_BASE}${endpoint.url}`);
                         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -454,6 +454,32 @@
                     } finally {
                         setLoading(prev => ({ ...prev, [endpoint.name]: false }));
                     }
+                }
+
+                // Fetch NEW multi-agent recommendations for key tickers
+                try {
+                    const tickers = ['APLD', 'NTLA', 'UUUU'];  // Your watchlist
+                    const newRecs = [];
+
+                    for (const ticker of tickers) {
+                        try {
+                            const response = await fetch(`${API_BASE}/api/recommendations/analyze/${ticker}?apply_risk=true`);
+                            if (response.ok) {
+                                const rec = await response.json();
+                                newRecs.push(rec);
+                            }
+                        } catch (err) {
+                            console.error(`Failed to analyze ${ticker}:`, err);
+                        }
+                    }
+
+                    setRecommendations(newRecs);
+                    setErrors(prev => ({ ...prev, recommendations: null }));
+                } catch (error) {
+                    console.error('Error fetching recommendations:', error);
+                    setErrors(prev => ({ ...prev, recommendations: 'Failed to load recommendations' }));
+                } finally {
+                    setLoading(prev => ({ ...prev, recommendations: false }));
                 }
 
                 setLastUpdate(new Date());
