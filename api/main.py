@@ -45,18 +45,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS - Allow localhost and file:// for development
+# Configure CORS - Allow all origins for Railway deployment
+# In production, Railway URL will work, and in dev, localhost works
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://localhost:3000",
-        "null"  # Allow file:// protocol
-    ],
+    allow_origins=["*"],  # Allow all origins (Railway, localhost, etc.)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Get the base directory
