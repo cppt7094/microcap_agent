@@ -3,7 +3,7 @@ Business Logic Services for Project Tehama API
 """
 import sys
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 # Add parent directory to path for imports

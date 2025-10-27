@@ -3,7 +3,7 @@
 # ============================================================================
 
 # Configuration files with API keys
-config.py
+# config.py - safe to commit, only contains os.getenv wrappers
 .env
 .env.local
 API Keys.txt
